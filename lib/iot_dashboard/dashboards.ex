@@ -10,32 +10,36 @@ defmodule IotDashboard.Dashboards do
         :width => 2,
         :height => 2,
         :type => "text",
+        :value => nil,
         :options => %{
-          "value" => "N/A",
           "title" => "Temp 1"
         }
       },
       %{
         :id => "2",
+        :name => "temperature",
+        :data_type => "float",
         :x => 3,
         :y => 0,
         :type => "text",
         :width => 3,
         :height => 3,
+        :value => 12,
         :options => %{
-          "value" => "N/A",
           "title" => "Temp 2"
         }
       },
       %{
         :id => "3",
+        :name => "humidity",
+        :data_type => "float",
+        :value => 3.4,
         :x => 6,
         :y => 0,
         :type => "text",
         :width => 3,
         :height => 3,
         :options => %{
-          "value" => "N/A",
           "title" => "Temp 3"
         }
       },
@@ -47,7 +51,6 @@ defmodule IotDashboard.Dashboards do
         :width => 4,
         :height => 3,
         :options => %{
-          "value" => "N/A",
           "title" => "Temp 4"
         }
       },
@@ -58,9 +61,8 @@ defmodule IotDashboard.Dashboards do
         :type => "switch",
         :width => 4,
         :height => 3,
-        :options => %{
-          "value" => "true"
-        }
+        "value" => "true",
+        :options => %{}
       }
     ]
   }

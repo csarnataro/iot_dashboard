@@ -32,7 +32,9 @@ defmodule IotDashboardWeb.DashboardLive do
     widgets = dashboard.widgets
 
     socket =
-      stream(socket, :widgets, widgets, dom_id: &"w_#{&1.id}")
+      socket
+      |> assign(locked: true)
+      |> stream(:widgets, widgets, dom_id: &"w_#{&1.id}")
 
     {:ok, socket}
   end
@@ -47,34 +49,40 @@ defmodule IotDashboardWeb.DashboardLive do
     # gs-max-w={if widget[:max_width], do: widget[:max_width], else: 6}
     # gs-max-h={if widget[:max_height], do: widget[:max_height], else: 6}
 
+    IO.puts("******** BEGIN: dashboard_live:52 ********")
+    IO.inspect(Map.has_key?(assigns, :locked), pretty: true)
+    IO.inspect(assigns[:locked], pretty: true)
+    IO.puts("********   END: dashboard_live:52 ********")
+
+    assigns =
+      assigns
+      |> assign_new(:locked, fn ->
+        if Map.has_key?(assigns, :locked), do: assigns[:locked], else: true
+      end)
+
     ~H"""
     <div>
-      <div>
-        <.form for={%{}} phx-submit="publish_to_mqtt" class="flex gap-2">
-          <span>
-            <.input
-              type="select"
-              class="border rounded"
-              name="widget"
-              value="1"
-              options={[1, 2, 3, 4]}
-            />
-          </span>
-          <span class="flex gap-2 items-center">
-            Temperature: <.input type="text" name="temperature" value="" field={:temperature} />
-          </span>
-          <button class="rounded bg-blue-600 p-1 text-white">Send</button>
-        </.form>
-      </div>
+      <%= assigns[:locked] %>
+      <hr />
+      <button
+        phx-click={:toggle_lock}
+        phx-value-locked={if @locked, do: "true", else: "false"}
+        class="rounded bg-blue-600 p-1 text-white"
+      >
+        <%= if @locked, do: "Unlock", else: "Lock" %>
+      </button>
+
       <div class="h-screen bg-gray-100 rounded rounded-xl p-4">
         <div
           id="GridStackHook"
           class="grid-stack bg-gray-100 gs-12"
           phx-hook="GridStackHook"
           phx-update="stream"
+          gs-static={if @locked, do: "true", else: "false"}
         >
           <div
             :for={{id, widget} <- @streams.widgets}
+            id={id}
             class="grid-stack-item"
             gs-locked="yes"
             gs-x={widget[:x]}
@@ -87,16 +95,16 @@ defmodule IotDashboardWeb.DashboardLive do
             gs-max-h={if widget[:max_height], do: widget[:max_height], else: 6}
           >
             <div class="grid-stack-item-content border rounded-lg bg-white pt-0 pb-4 h-100 flex flex-col">
-              <div class="card-header cursor-pointer justify-between flex shrink pl-2 pr-1">
+              <div class={"card-header justify-between flex shrink pl-2 pr-1 #{if @locked, do: "cursor-auto", else: "cursor-pointer" }"}>
                 <span class="text-xs p-1 text-ellipsis text-nowrap overflow-hidden w-full select-none">
-                  <%= widget[:options]["title"] %>
+                  <%= assigns[:locked] %><%= widget[:options]["title"] %>
                 </span>
                 <span class="text-gray-500 p-1 select-none">
                   <Heroicons.icon name="cog-6-tooth" type="outline" class="h-4 w-4 text-gray-800" />
                 </span>
               </div>
-              <div class="grow flex justify-center flex-col h-full mx-auto px-2" id={id}>
-                <%= render_widget(assigns, widget[:type], widget[:options]) %>
+              <div class="grow flex justify-center flex-col h-full mx-auto px-2">
+                <%= render_widget(assigns, widget) %>
               </div>
             </div>
           </div>
@@ -106,23 +114,40 @@ defmodule IotDashboardWeb.DashboardLive do
     """
   end
 
-  def handle_event("publish_to_mqtt", params, socket) do
-    %{"widget" => id, "temperature" => temperature} = params
-    temperature = invariant(temperature, "N/A")
-    {:ok, payload} = Jason.encode(%{id: id, value: temperature})
-    ExMQTT.publish(payload, "test/csarnataro/#{id}", 0)
-    {:noreply, socket}
-  end
-
   def handle_event("widget:move", %{"positions" => new_positions}, socket) do
     "w_" <> widget_id = Map.keys(new_positions) |> List.first()
     new_positions = Map.fetch(new_positions, "w_" <> widget_id)
-
     Dashboards.move_widget("", widget_id, new_positions)
     {:noreply, socket}
   end
 
+  def handle_event("toggle_lock", %{"locked" => "true"}, socket) do
+    IO.puts("******** BEGIN: dashboard_live:144 ********")
+    IO.inspect("NOW IS TRUE", pretty: true)
+    IO.puts("********   END: dashboard_live:144 ********")
+
+    {:noreply, socket |> assign(locked: false)}
+  end
+
+  def handle_event("toggle_lock", %{"locked" => "false"}, socket) do
+    IO.puts("******** BEGIN: dashboard_live:144 ********")
+    IO.inspect("NOW IS FALSE", pretty: true)
+    IO.puts("********   END: dashboard_live:144 ********")
+
+    {:noreply, socket |> assign(locked: true)}
+  end
+
+  # do nothing if the dashboard is locked, to avoid JS errors!!!
+  # def handle_info({:new_mqtt_message, _}, %{:assigns => %{locked: "false"}} = socket) do
+  #   {:noreply, socket}
+  # end
+
+  # update values if dashboard is locked
   def handle_info({:new_mqtt_message, message}, socket) do
+    IO.puts("******** BEGIN: dashboard_live:143 ********")
+    IO.inspect(message, pretty: true)
+    IO.puts("********   END: dashboard_live:143 ********")
+
     {:ok, widgets} =
       Dashboards.get_dashboard("dashboard_id")
       |> Map.fetch(:widgets)
@@ -133,21 +158,40 @@ defmodule IotDashboardWeb.DashboardLive do
         fn w -> if w.id == message["id"], do: w end
       )
 
-    widget_options = widget_to_update.options |> Map.merge(%{"value" => message["value"]})
-    widget_to_update = %{widget_to_update | options: widget_options}
+    widget_to_update = Map.put(widget_to_update, :value, message["value"])
 
-    {:noreply, socket |> stream_insert(:widgets, widget_to_update)}
+    {:noreply,
+     socket
+     |> stream_insert(:widgets, widget_to_update)}
   end
 
-  defp render_widget(assigns, type, options) do
+  defp render_widget(assigns, widget) do
+    IO.puts("******** BEGIN: dashboard_live:161 ********")
+    IO.inspect(widget, pretty: true)
+    IO.puts("********   END: dashboard_live:161 ********")
+    value = invariant(widget, :value, "N/A")
+    data_type = invariant(widget, :data_type, "string")
+    type = invariant(widget, :type, "text")
+    options = widget[:options]
+
     get_func_component(type).(
       assigns
+      |> assign(:value, value)
+      |> assign(:data_type, data_type)
       |> assign(:options, options)
     )
   end
 
-  defp invariant(var, def) do
-    if var == "" or var == nil, do: def, else: var
+  defp invariant(map, key, default) do
+    if Map.has_key?(map, key) do
+      invariant(Map.fetch!(map, key), default)
+    else
+      default
+    end
+  end
+
+  defp invariant(var, default) do
+    if var == "" or var == nil, do: default, else: var
   end
 
   defp get_func_component("text"), do: &Text.display/1

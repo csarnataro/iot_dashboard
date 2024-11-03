@@ -6,7 +6,7 @@ defmodule IotDashboardWeb.Widgets.Text do
   def display(assigns) do
     ~H"""
     <div>
-      <span><%= @options["value"] %></span>
+      <span><%= @value %></span>
     </div>
     """
   end
