@@ -75,7 +75,6 @@ defmodule IotDashboardWeb.DashboardLive do
         >
           <div
             :for={{id, widget} <- @streams.widgets}
-            id={id}
             class="grid-stack-item"
             gs-locked="yes"
             gs-x={widget[:x]}
@@ -96,7 +95,7 @@ defmodule IotDashboardWeb.DashboardLive do
                   <Heroicons.icon name="cog-6-tooth" type="outline" class="h-4 w-4 text-gray-800" />
                 </span>
               </div>
-              <div class="grow flex justify-center flex-col h-full mx-auto px-2">
+              <div class="grow flex justify-center flex-col h-full mx-auto px-2" id={id}>
                 <%= render_widget(assigns, widget[:type], widget[:options]) %>
               </div>
             </div>
@@ -124,8 +123,9 @@ defmodule IotDashboardWeb.DashboardLive do
   end
 
   def handle_info({:new_mqtt_message, message}, socket) do
-    dashboard = Dashboards.get_dashboard("dashboard_id")
-    widgets = dashboard.widgets
+    {:ok, widgets} =
+      Dashboards.get_dashboard("dashboard_id")
+      |> Map.fetch(:widgets)
 
     widget_to_update =
       Enum.find(
@@ -137,7 +137,6 @@ defmodule IotDashboardWeb.DashboardLive do
     widget_to_update = %{widget_to_update | options: widget_options}
 
     {:noreply, socket |> stream_insert(:widgets, widget_to_update)}
-    # {:noreply, socket}
   end
 
   defp render_widget(assigns, type, options) do

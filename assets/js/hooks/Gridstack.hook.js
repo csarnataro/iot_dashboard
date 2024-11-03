@@ -1,6 +1,7 @@
 // WidgetGridHook.js
 
-import { GridStack } from "gridstack";
+import { GridStack } from 'gridstack';
+
 
 function positions(items) {
   return items.reduce((acc, item) => {
@@ -32,6 +33,7 @@ const options = {
 const GridStackHook = {
   mounted() {
     this.grid = GridStack.init(options);
+
     this.grid.on("change", (_event, items) => {
       if (items) {
         this.pushEvent("widget:move", { positions: positions(items) });
@@ -44,6 +46,7 @@ const GridStackHook = {
   },
 
   updated() {
+
     this.grid = GridStack.init(options);
 
     this.grid.on("change", (_event, items) => {
