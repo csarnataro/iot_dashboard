@@ -81,7 +81,7 @@ defmodule IotDashboard.Dashboards do
   end
 
   def move_widget(_dashboard_id, widget_id, widget_position) do
-    GenServer.cast(__MODULE__, {:move_widget, widget_id, widget_position})
+    GenServer.call(__MODULE__, {:move_widget, widget_id, widget_position})
   end
 
   def write(key, val) do
@@ -106,7 +106,7 @@ defmodule IotDashboard.Dashboards do
 
   ## Server API
 
-  def init(args) do
+  def init(_args) do
     {:ok, @initial_dashboard}
   end
 
@@ -122,11 +122,11 @@ defmodule IotDashboard.Dashboards do
     {:reply, Map.has_key?(cache, key), cache}
   end
 
-  def handle_cast({:write, key, val}, cache) do
-    {:noreply, Map.put(cache, key, val)}
-  end
-
-  def handle_cast({:move_widget, widget_id, {:ok, widget_position}}, %{widgets: widgets} = cache) do
+  def handle_call(
+        {:move_widget, widget_id, {:ok, widget_position}},
+        _from,
+        %{widgets: widgets} = cache
+      ) do
     updated_widget_idx =
       Enum.find_index(widgets, fn w -> w[:id] == widget_id end)
 
@@ -142,7 +142,12 @@ defmodule IotDashboard.Dashboards do
       widgets
       |> List.replace_at(updated_widget_idx, updated_widget)
 
-    {:noreply, %{cache | widgets: updated_widgets}}
+    new_dashboard = %{cache | widgets: updated_widgets}
+    {:reply, new_dashboard, new_dashboard}
+  end
+
+  def handle_cast({:write, key, val}, cache) do
+    {:noreply, Map.put(cache, key, val)}
   end
 
   def handle_cast({:delete, key}, cache) do

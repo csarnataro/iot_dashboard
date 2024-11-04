@@ -1,4 +1,5 @@
 defmodule IotDashboard.Mqtt.PublishHandler do
+  alias IotDashboard.Mqtt.Client
   alias Phoenix.PubSub
   # @moduledoc """
   # Publish Handler behaviour for the MQTT client.
@@ -6,8 +7,6 @@ defmodule IotDashboard.Mqtt.PublishHandler do
   # not when the app publish a message
   # """
   @behaviour ExMQTT.PublishHandler
-
-  @topic "mqtt_updates"
 
   def handle_publish(message, term) do
     message =
@@ -19,6 +18,10 @@ defmodule IotDashboard.Mqtt.PublishHandler do
           %{"value" => "N/A"}
       end
 
-    PubSub.broadcast(IotDashboard.PubSub, @topic, {:new_mqtt_message, message})
+    PubSub.broadcast(
+      IotDashboard.PubSub,
+      Client.mqtt_updates_event(),
+      {:new_mqtt_message, message}
+    )
   end
 end

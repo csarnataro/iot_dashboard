@@ -11,8 +11,6 @@ defmodule IotDashboardWeb.DashboardLive do
   alias IotDashboardWeb.Widgets.Led
   use IotDashboardWeb, :live_view
 
-  @topic "mqtt_updates"
-
   def mount(_params, _session, socket) do
     dashboard = Dashboards.get_dashboard("dashboard_id")
 
@@ -23,7 +21,7 @@ defmodule IotDashboardWeb.DashboardLive do
     case connected?(socket) do
       true ->
         MqttClient.start()
-        MqttClient.subscribe(@topic)
+        MqttClient.subscribe(MqttClient.mqtt_updates_event())
 
       false ->
         nil
@@ -34,26 +32,12 @@ defmodule IotDashboardWeb.DashboardLive do
     socket =
       socket
       |> assign(locked: true)
-      |> stream(:widgets, widgets, dom_id: &"w_#{&1.id}")
+      |> assign(:widgets, widgets)
 
     {:ok, socket}
   end
 
   def render(assigns) do
-    # gs-x={widget[:x]}
-    # gs-y={widget[:y]}
-    # gs-w={widget[:width]}
-    # gs-h={widget[:height]}
-    # gs-min-w={if widget[:min_width], do: widget[:min_width], else: 2}
-    # gs-min-h={if widget[:min_height], do: widget[:min_height], else: 2}
-    # gs-max-w={if widget[:max_width], do: widget[:max_width], else: 6}
-    # gs-max-h={if widget[:max_height], do: widget[:max_height], else: 6}
-
-    IO.puts("******** BEGIN: dashboard_live:52 ********")
-    IO.inspect(Map.has_key?(assigns, :locked), pretty: true)
-    IO.inspect(assigns[:locked], pretty: true)
-    IO.puts("********   END: dashboard_live:52 ********")
-
     assigns =
       assigns
       |> assign_new(:locked, fn ->
@@ -62,27 +46,29 @@ defmodule IotDashboardWeb.DashboardLive do
 
     ~H"""
     <div>
-      <%= assigns[:locked] %>
-      <hr />
-      <button
-        phx-click={:toggle_lock}
-        phx-value-locked={if @locked, do: "true", else: "false"}
-        class="rounded bg-blue-600 p-1 text-white"
-      >
-        <%= if @locked, do: "Unlock", else: "Lock" %>
-      </button>
-
       <div class="h-screen bg-gray-100 rounded rounded-xl p-4">
+        <div class="rounded-lg border bg-white absolute right-12 z-10 p-1 pb-0">
+          <button
+            class="z-10"
+            phx-click={:toggle_lock}
+            phx-value-locked={if @locked, do: "true", else: "false"}
+          >
+            <Heroicons.icon
+              name={if @locked, do: "lock-closed", else: "lock-open"}
+              type="solid"
+              class="h-8 w-8 text-gray-400"
+            />
+          </button>
+        </div>
         <div
           id="GridStackHook"
           class="grid-stack bg-gray-100 gs-12"
           phx-hook="GridStackHook"
-          phx-update="stream"
           gs-static={if @locked, do: "true", else: "false"}
         >
           <div
-            :for={{id, widget} <- @streams.widgets}
-            id={id}
+            :for={widget <- @widgets}
+            id={"w_#{widget[:id]}"}
             class="grid-stack-item"
             gs-locked="yes"
             gs-x={widget[:x]}
@@ -94,10 +80,13 @@ defmodule IotDashboardWeb.DashboardLive do
             gs-max-w={if widget[:max_width], do: widget[:max_width], else: 6}
             gs-max-h={if widget[:max_height], do: widget[:max_height], else: 6}
           >
-            <div class="grid-stack-item-content border rounded-lg bg-white pt-0 pb-4 h-100 flex flex-col">
+            <div class={"grid-stack-item-content border rounded-lg bg-white pt-0 pb-4 h-100 flex flex-col #{if @locked, do: "blocked_widget"}"}>
               <div class={"card-header justify-between flex shrink pl-2 pr-1 #{if @locked, do: "cursor-auto", else: "cursor-pointer" }"}>
-                <span class="text-xs p-1 text-ellipsis text-nowrap overflow-hidden w-full select-none">
-                  <%= assigns[:locked] %><%= widget[:options]["title"] %>
+                <span class={"relative text-sm select-none cursor-pointer transition-all #{if @locked, do: "opacity-0 left-[-20px]", else: "visible left-0" }"}>
+                  :::
+                </span>
+                <span class={"relative text-xs p-1 text-ellipsis text-nowrap overflow-hidden w-full select-none transition-all #{if @locked, do: "left-[-15px]", else: "left-[5px]" }"}>
+                  <%= widget[:options]["title"] %>
                 </span>
                 <span class="text-gray-500 p-1 select-none">
                   <Heroicons.icon name="cog-6-tooth" type="outline" class="h-4 w-4 text-gray-800" />
@@ -110,6 +99,17 @@ defmodule IotDashboardWeb.DashboardLive do
           </div>
         </div>
       </div>
+      <details>
+        <summary class="fixed overflow-hidden right-1 bottom-1 bg-green-300 z-10 p-2 rounded">
+          <span class="text-serif">Inspect</span>
+        </summary>
+        <pre
+          id="details_box"
+          class="fixed block text-xs overflow-auto right-1 w-96 h-[50vh] rounded bottom-12 bg-yellow-100 z-10 p-2"
+        >
+        <pre><%= inspect(@widgets, pretty: true) %></pre>
+      </pre>
+      </details>
     </div>
     """
   end
@@ -117,58 +117,48 @@ defmodule IotDashboardWeb.DashboardLive do
   def handle_event("widget:move", %{"positions" => new_positions}, socket) do
     "w_" <> widget_id = Map.keys(new_positions) |> List.first()
     new_positions = Map.fetch(new_positions, "w_" <> widget_id)
-    Dashboards.move_widget("", widget_id, new_positions)
-    {:noreply, socket}
+
+    updated_dashboard = Dashboards.move_widget("", widget_id, new_positions)
+
+    {
+      :noreply,
+      assign(socket, :widgets, updated_dashboard.widgets)
+    }
   end
 
   def handle_event("toggle_lock", %{"locked" => "true"}, socket) do
-    IO.puts("******** BEGIN: dashboard_live:144 ********")
-    IO.inspect("NOW IS TRUE", pretty: true)
-    IO.puts("********   END: dashboard_live:144 ********")
-
     {:noreply, socket |> assign(locked: false)}
   end
 
   def handle_event("toggle_lock", %{"locked" => "false"}, socket) do
-    IO.puts("******** BEGIN: dashboard_live:144 ********")
-    IO.inspect("NOW IS FALSE", pretty: true)
-    IO.puts("********   END: dashboard_live:144 ********")
-
     {:noreply, socket |> assign(locked: true)}
   end
 
   # do nothing if the dashboard is locked, to avoid JS errors!!!
-  # def handle_info({:new_mqtt_message, _}, %{:assigns => %{locked: "false"}} = socket) do
-  #   {:noreply, socket}
-  # end
+  def handle_info({:new_mqtt_message, message}, %{assigns: %{locked: false}} = socket) do
+    {:noreply, socket}
+  end
 
-  # update values if dashboard is locked
-  def handle_info({:new_mqtt_message, message}, socket) do
-    IO.puts("******** BEGIN: dashboard_live:143 ********")
-    IO.inspect(message, pretty: true)
-    IO.puts("********   END: dashboard_live:143 ********")
-
+  # update values only if dashboard is locked
+  def handle_info(
+        {:new_mqtt_message, message},
+        %{assigns: %{locked: true}} = socket
+      ) do
     {:ok, widgets} =
       Dashboards.get_dashboard("dashboard_id")
       |> Map.fetch(:widgets)
 
-    widget_to_update =
-      Enum.find(
-        widgets,
-        fn w -> if w.id == message["id"], do: w end
-      )
+    widget_index = Enum.find_index(widgets, fn w -> if w.id == message["id"], do: w end)
+    widget_to_update = Enum.at(widgets, widget_index) |> Map.put(:value, message["value"])
+    widgets = List.replace_at(widgets, widget_index, widget_to_update)
 
-    widget_to_update = Map.put(widget_to_update, :value, message["value"])
-
-    {:noreply,
-     socket
-     |> stream_insert(:widgets, widget_to_update)}
+    {
+      :noreply,
+      assign(socket, :widgets, widgets)
+    }
   end
 
   defp render_widget(assigns, widget) do
-    IO.puts("******** BEGIN: dashboard_live:161 ********")
-    IO.inspect(widget, pretty: true)
-    IO.puts("********   END: dashboard_live:161 ********")
     value = invariant(widget, :value, "N/A")
     data_type = invariant(widget, :data_type, "string")
     type = invariant(widget, :type, "text")

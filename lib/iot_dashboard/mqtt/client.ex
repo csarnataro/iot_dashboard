@@ -8,6 +8,8 @@ defmodule IotDashboard.Mqtt.Client do
   @port 1883
   @base_opts @host ++ [port: @port] ++ [client_id: "test_client_id"]
 
+  def mqtt_updates_event, do: "mqtt_updates"
+
   def start do
     opts =
       @base_opts ++
