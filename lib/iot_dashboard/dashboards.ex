@@ -10,21 +10,21 @@ defmodule IotDashboard.Dashboards do
         :width => 2,
         :height => 2,
         :type => "text",
-        :value => nil,
+        :properties => ["temperature"],
         :options => %{
           "title" => "Temperatura 1"
         }
       },
       %{
         :id => "2",
-        :name => "temperature",
         :data_type => "float",
         :x => 3,
         :y => 0,
-        :type => "text",
+        :type => "status",
         :width => 3,
         :height => 3,
-        :value => 12,
+        :value => nil,
+        :properties => ["humidity"],
         :options => %{
           "title" => "Temp 2"
         }
@@ -86,6 +86,18 @@ defmodule IotDashboard.Dashboards do
 
   def update_options(widget_id, option_name, option_value) do
     GenServer.call(__MODULE__, {:update_options, widget_id, option_name, option_value})
+  end
+
+  def delete_widget(widget_id) do
+    GenServer.call(__MODULE__, {:delete_widget, widget_id})
+  end
+
+  def create_widget(type, name, property) do
+    GenServer.call(__MODULE__, {:create_widget, type, name, property})
+  end
+
+  def update_all_widgets(widgets) do
+    GenServer.cast(__MODULE__, {:update_all_widgets, widgets})
   end
 
   def write(key, val) do
@@ -150,6 +162,35 @@ defmodule IotDashboard.Dashboards do
     {:reply, new_dashboard, new_dashboard}
   end
 
+  def handle_call({:create_widget, type, name, property}, _from, %{widgets: widgets} = cache) do
+    new_widget = %{
+      :id => :crypto.strong_rand_bytes(10) |> Base.encode32(),
+      :x => 0,
+      :y => 0,
+      :width => 2,
+      :height => 2,
+      :type => type,
+      :properties => [property],
+      :options => %{
+        "title" => name
+      }
+    }
+
+    updated_widgets = [new_widget | widgets]
+
+    new_dashboard = %{cache | widgets: updated_widgets}
+    {:reply, new_dashboard, new_dashboard}
+  end
+
+  def handle_call({:delete_widget, widget_id}, _from, %{widgets: widgets} = cache) do
+    updated_widgets =
+      widgets
+      |> Enum.filter(fn w -> w[:id] !== widget_id end)
+
+    new_dashboard = %{cache | widgets: updated_widgets}
+    {:reply, new_dashboard, new_dashboard}
+  end
+
   def handle_call(
         {:update_options, widget_id, name, value},
         _from,
@@ -164,10 +205,6 @@ defmodule IotDashboard.Dashboards do
 
     updated_options = Map.put(updated_widget[:options], name, value)
 
-    IO.puts("******** BEGIN: Dashboards:176 ********")
-    IO.inspect(updated_options, pretty: true)
-    IO.puts("********   END: Dashboards:176 ********")
-
     updated_widget =
       updated_widget
       |> Map.put(:options, updated_options)
@@ -178,6 +215,10 @@ defmodule IotDashboard.Dashboards do
 
     new_dashboard = %{cache | widgets: updated_widgets}
     {:reply, new_dashboard, new_dashboard}
+  end
+
+  def handle_cast({:update_all_widgets, widgets}, cache) do
+    {:noreply, Map.put(cache, :widgets, widgets)}
   end
 
   def handle_cast({:write, key, val}, cache) do

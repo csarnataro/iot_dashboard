@@ -1,3 +1,7 @@
+#GridStackHook:not([gs-static]) > div.grid-stack-item > div.grid-stack-item-content {
+   background-color: #f6f6f6;
+   border: 1px solid lightgray;
+}
 
 .gs-24 > .grid-stack-item {
     width: 4.167%;

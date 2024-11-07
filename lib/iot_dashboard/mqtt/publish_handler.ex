@@ -8,14 +8,16 @@ defmodule IotDashboard.Mqtt.PublishHandler do
   # """
   @behaviour ExMQTT.PublishHandler
 
-  def handle_publish(message, term) do
+  def handle_publish(message, _term) do
+    topic_id = String.split(message[:topic], "/") |> List.last()
+
     message =
       case Jason.decode(message[:payload] |> String.replace("\'", "\"")) do
         {:ok, payload} ->
-          %{"id" => "1", "value" => "#{payload}"}
+          %{"id" => topic_id, "value" => "#{payload}"}
 
         _ ->
-          %{"value" => "N/A"}
+          %{"value" => "--"}
       end
 
     PubSub.broadcast(

@@ -1,6 +1,9 @@
 defmodule IotDashboardWeb.DashboardLive do
   # use Phoenix.LiveView
 
+  import IotDashboardWeb.Modals
+
+  alias IotDashboardWeb.Widgets.Status
   alias IotDashboard.WidgetRegistry
   alias IotDashboard.Mqtt.Client, as: MqttClient
   alias IotDashboard.Dashboards
@@ -14,9 +17,9 @@ defmodule IotDashboardWeb.DashboardLive do
   def mount(_params, _session, socket) do
     dashboard = Dashboards.get_dashboard("dashboard_id")
 
-    for widget <- if(dashboard != nil, do: dashboard.widgets, else: []) do
-      WidgetRegistry.register_widget(widget.id)
-    end
+    # for widget <- if(dashboard != nil, do: dashboard.widgets, else: []) do
+    #   WidgetRegistry.register_widget(widget.id)
+    # end
 
     case connected?(socket) do
       true ->
@@ -33,6 +36,7 @@ defmodule IotDashboardWeb.DashboardLive do
       socket
       |> assign(locked: true)
       |> assign(:widgets, widgets)
+      |> assign(:dashboard, dashboard)
 
     {:ok, socket}
   end
@@ -50,26 +54,36 @@ defmodule IotDashboardWeb.DashboardLive do
 
     ~H"""
     <div>
-      <div class="h-screen bg-gray-100 rounded rounded-xl p-4">
-        <div
-          class="rounded-lg border bg-white absolute right-12 z-10 p-1 pb-0"
-          title="Click to lock/unlock widgets position"
-        >
+      <div class="flex justify-between w-full pb-1">
+        <div>Dashboard 1</div>
+        <nav aria-label="Toolbar" class="xt-list xt-list-2">
           <button
-            class="z-10"
+            title="Click to add a new widget"
+            class="rounded-lg border bg-white z-10 p-1"
+            phx-click={:show_new_widget_modal}
+          >
+            <Heroicons.icon name="plus" type="solid" class="h-5 w-5 text-gray-400" />
+          </button>
+
+          <button
+            title="Click to lock/unlock widgets position"
+            class="rounded-lg border bg-white z-10 p-1"
             phx-click={:toggle_lock}
             phx-value-locked={if @locked, do: "true", else: "false"}
           >
             <Heroicons.icon
               name={if @locked, do: "lock-closed", else: "lock-open"}
               type="solid"
-              class="h-8 w-8 text-gray-400"
+              class="h-5 w-5 text-gray-400"
             />
           </button>
-        </div>
+        </nav>
+      </div>
+
+      <div>
         <div
           id="GridStackHook"
-          class="grid-stack bg-gray-100 gs-12"
+          class="grid-stack bg-gray-100 gs-12 rounded rounded-xl mb-8 min-h-[80vh]"
           phx-hook="GridStackHook"
           gs-static={if @locked, do: "true", else: "false"}
         >
@@ -87,7 +101,7 @@ defmodule IotDashboardWeb.DashboardLive do
             gs-max-w={if widget[:max_width], do: widget[:max_width], else: 6}
             gs-max-h={if widget[:max_height], do: widget[:max_height], else: 6}
           >
-            <div class={"grid-stack-item-content border rounded-lg bg-white pt-0 pb-4 h-100 flex flex-col #{if @locked, do: "blocked_widget"}"}>
+            <div class={"grid-stack-item-content border rounded-lg bg-white pt-0 pb-2 h-100 flex flex-col #{if @locked, do: "blocked_widget"}"}>
               <div class={"card-header justify-between flex shrink pl-2 pr-1 #{if @locked, do: "cursor-auto", else: "cursor-pointer" }"}>
                 <span class={"relative text-sm select-none cursor-pointer transition-all #{if @locked, do: "opacity-0 left-[-20px]", else: "visible left-0" }"}>
                   :::
@@ -105,35 +119,18 @@ defmodule IotDashboardWeb.DashboardLive do
                 >
                 </button>
               </div>
-              <div class="grow flex justify-center flex-col h-full mx-auto px-2">
+              <div class="grow flex justify-center flex-col items-center h-full px-2">
                 <%= render_widget(assigns, widget) %>
               </div>
             </div>
           </div>
         </div>
       </div>
+      <%= if assigns[:show_new_widget_modal] do %>
+        <.new_widget_modal />
+      <% end %>
       <%= if assigns[:show_settings_modal] do %>
-        <.modal show={true} id="modal" on_cancel={JS.push("hide_settings_modal")}>
-          <h1>Settings for widget <%= @selected_widget[:id] %></h1>
-          <.form for={@selected_widget_form} phx-submit="save_settings">
-            <.input type="text" field={@selected_widget_form[:title]} />
-            <input type="hidden" name="widget_id" value={@selected_widget[:id]} />
-            <button
-              type="submit"
-              class="bg-blue-800 text-white px-2 py-1 rounded mt-2"
-              phx-click={JS.push("hide_settings_modal")}
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              class="text-gray-600 px-2 py-1 border rounded mt-2"
-              phx-click={JS.push("hide_settings_modal")}
-            >
-              Cancel
-            </button>
-          </.form>
-        </.modal>
+        <.settings_modal widget={@selected_widget} form={@selected_widget_form} />
       <% end %>
 
       <details>
@@ -144,7 +141,7 @@ defmodule IotDashboardWeb.DashboardLive do
           id="details_box"
           class="fixed block text-xs overflow-auto right-1 w-96 h-[50vh] rounded bottom-12 bg-yellow-100 z-10 p-2"
         >
-        <pre><%= inspect(@widgets, pretty: true) %></pre>
+        <pre><%= inspect(@dashboard.widgets, pretty: true) %></pre>
       </pre>
       </details>
     </div>
@@ -160,6 +157,42 @@ defmodule IotDashboardWeb.DashboardLive do
     {
       :noreply,
       assign(socket, :widgets, updated_dashboard.widgets)
+    }
+  end
+
+  def handle_event("show_new_widget_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_new_widget_modal, true)}
+  end
+
+  def handle_event("hide_new_widget_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_new_widget_modal, false)}
+  end
+
+  def handle_event(
+        "add_new_widget",
+        %{"type" => type, "name" => name, "property" => property},
+        socket
+      ) do
+    updated_dashboard = Dashboards.create_widget(type, name, property)
+
+    {
+      :noreply,
+      assign(socket, :widgets, updated_dashboard.widgets)
+    }
+  end
+
+  def handle_event("delete_widget", %{"widget_id" => widget_id}, socket) do
+    updated_dashboard = Dashboards.delete_widget(widget_id)
+
+    {
+      :noreply,
+      socket
+      |> assign(:show_settings_modal, false)
+      |> assign(:widgets, updated_dashboard.widgets)
     }
   end
 
@@ -196,17 +229,19 @@ defmodule IotDashboardWeb.DashboardLive do
     {:noreply, socket |> assign(locked: true)}
   end
 
-  def handle_event("save_settings", params, socket) do
-    updated_dashboard = Dashboards.update_options(params["widget_id"], "title", params["title"])
+  def handle_event("save_settings", %{"widget_id" => widget_id, "title" => title}, socket) do
+    updated_dashboard = Dashboards.update_options(widget_id, "title", title)
 
     {
       :noreply,
-      assign(socket, :widgets, updated_dashboard.widgets)
+      socket
+      |> assign(:widgets, updated_dashboard.widgets)
+      |> assign(:show_settings_modal, false)
     }
   end
 
   # do nothing if the dashboard is locked, to avoid JS errors!!!
-  def handle_info({:new_mqtt_message, message}, %{assigns: %{locked: false}} = socket) do
+  def handle_info({:new_mqtt_message, _message}, %{assigns: %{locked: false}} = socket) do
     {:noreply, socket}
   end
 
@@ -219,9 +254,15 @@ defmodule IotDashboardWeb.DashboardLive do
       Dashboards.get_dashboard("dashboard_id")
       |> Map.fetch(:widgets)
 
+    IO.puts("******** BEGIN: dashboard_live:255 ********")
+    IO.inspect(message["value"], pretty: true)
+    IO.puts("********   END: dashboard_live:255 ********")
+
     widget_index = Enum.find_index(widgets, fn w -> if w.id == message["id"], do: w end)
     widget_to_update = Enum.at(widgets, widget_index) |> Map.put(:value, message["value"])
     widgets = List.replace_at(widgets, widget_index, widget_to_update)
+
+    Dashboards.update_all_widgets(widgets)
 
     {
       :noreply,
@@ -230,7 +271,7 @@ defmodule IotDashboardWeb.DashboardLive do
   end
 
   defp render_widget(assigns, widget) do
-    value = invariant(widget, :value, "N/A")
+    value = invariant(widget, :value, "--")
     data_type = invariant(widget, :data_type, "string")
     type = invariant(widget, :type, "text")
     options = widget[:options]
@@ -258,6 +299,7 @@ defmodule IotDashboardWeb.DashboardLive do
   defp get_func_component("text"), do: &Text.display/1
   defp get_func_component("led"), do: &Led.display/1
   defp get_func_component("switch"), do: &Switch.display/1
+  defp get_func_component("status"), do: &Status.display/1
   defp get_func_component("circular_progress"), do: &CircularProgress.display/1
   defp get_func_component(_), do: &NotAvailable.display/1
 end

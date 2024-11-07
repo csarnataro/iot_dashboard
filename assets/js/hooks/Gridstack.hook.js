@@ -25,7 +25,7 @@ const options = {
 //   },
 //   children: items,
   float: false,
-  column: 24,
+  column: 12,
   cellHeight: 'initial',
   handle: '.card-header'
 };

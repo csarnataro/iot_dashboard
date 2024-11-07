@@ -2,12 +2,12 @@ defmodule IotDashboard.Mqtt.Client do
   alias IotDashboard.Mqtt.DisconnectHandler
   alias IotDashboard.Mqtt.PublishHandler
 
-  @topic "/test/csarnataro/#"
-  @hostname "test.mosquitto.org"
+  @topic "test/csarnataro/#"
+  @hostname "broker.hivemq.com"
   @host [host: @hostname]
   @port 1883
   @base_opts @host ++ [port: @port] ++ [client_id: "test_client_id"]
-
+  @qos 0
   def mqtt_updates_event, do: "mqtt_updates"
 
   def start do
@@ -18,7 +18,7 @@ defmodule IotDashboard.Mqtt.Client do
 
     case ExMQTT.start_link(opts) do
       {:ok, _} ->
-        ExMQTT.subscribe(@topic, 1)
+        ExMQTT.subscribe(@topic, @qos)
 
       {:error, {:already_started, _}} ->
         nil

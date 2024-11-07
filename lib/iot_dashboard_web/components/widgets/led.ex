@@ -6,7 +6,7 @@ defmodule IotDashboardWeb.Widgets.Led do
   # I could have called it `render` but I wanted to avoid confusion
   # with the render method of live components
   def display(assigns) do
-    value = if Map.has_key?(assigns, :options), do: assigns[:options]["value"]
+    value = assigns[:value]
 
     color = if value == "true", do: @color_on, else: @color_off
     beam_fill = if value == "true", do: color, else: "none"
