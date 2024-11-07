@@ -12,7 +12,7 @@ defmodule IotDashboard.Dashboards do
         :type => "text",
         :value => nil,
         :options => %{
-          "title" => "Temp 1"
+          "title" => "Temperatura 1"
         }
       },
       %{
@@ -84,6 +84,10 @@ defmodule IotDashboard.Dashboards do
     GenServer.call(__MODULE__, {:move_widget, widget_id, widget_position})
   end
 
+  def update_options(widget_id, option_name, option_value) do
+    GenServer.call(__MODULE__, {:update_options, widget_id, option_name, option_value})
+  end
+
   def write(key, val) do
     GenServer.cast(__MODULE__, {:write, key, val})
   end
@@ -137,6 +141,36 @@ defmodule IotDashboard.Dashboards do
       |> Map.put(:y, widget_position["y"])
       |> Map.put(:width, widget_position["width"])
       |> Map.put(:height, widget_position["height"])
+
+    updated_widgets =
+      widgets
+      |> List.replace_at(updated_widget_idx, updated_widget)
+
+    new_dashboard = %{cache | widgets: updated_widgets}
+    {:reply, new_dashboard, new_dashboard}
+  end
+
+  def handle_call(
+        {:update_options, widget_id, name, value},
+        _from,
+        %{widgets: widgets} = cache
+      ) do
+    updated_widget_idx =
+      Enum.find_index(widgets, fn w -> w[:id] == widget_id end)
+
+    updated_widget =
+      widgets
+      |> Enum.at(updated_widget_idx)
+
+    updated_options = Map.put(updated_widget[:options], name, value)
+
+    IO.puts("******** BEGIN: Dashboards:176 ********")
+    IO.inspect(updated_options, pretty: true)
+    IO.puts("********   END: Dashboards:176 ********")
+
+    updated_widget =
+      updated_widget
+      |> Map.put(:options, updated_options)
 
     updated_widgets =
       widgets

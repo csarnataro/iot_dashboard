@@ -38,8 +38,12 @@ defmodule IotDashboardWeb.DashboardLive do
   end
 
   def render(assigns) do
+    # form_fields = %{"my_field" => "what"}
+
     assigns =
       assigns
+      # |> assign(settings_form: to_form(form_fields))
+      # |> assign(:create_form, %{"my_field" => %{"value" => "what", "name" => "which"}})
       |> assign_new(:locked, fn ->
         if Map.has_key?(assigns, :locked), do: assigns[:locked], else: true
       end)
@@ -47,7 +51,10 @@ defmodule IotDashboardWeb.DashboardLive do
     ~H"""
     <div>
       <div class="h-screen bg-gray-100 rounded rounded-xl p-4">
-        <div class="rounded-lg border bg-white absolute right-12 z-10 p-1 pb-0">
+        <div
+          class="rounded-lg border bg-white absolute right-12 z-10 p-1 pb-0"
+          title="Click to lock/unlock widgets position"
+        >
           <button
             class="z-10"
             phx-click={:toggle_lock}
@@ -85,12 +92,18 @@ defmodule IotDashboardWeb.DashboardLive do
                 <span class={"relative text-sm select-none cursor-pointer transition-all #{if @locked, do: "opacity-0 left-[-20px]", else: "visible left-0" }"}>
                   :::
                 </span>
-                <span class={"relative text-xs p-1 text-ellipsis text-nowrap overflow-hidden w-full select-none transition-all #{if @locked, do: "left-[-15px]", else: "left-[5px]" }"}>
+                <span
+                  title={widget[:options]["title"]}
+                  class={"relative text-xs p-1 text-ellipsis text-nowrap overflow-hidden w-full select-none transition-all #{if @locked, do: "left-[-15px]", else: "left-[5px]" }"}
+                >
                   <%= widget[:options]["title"] %>
                 </span>
-                <span class="text-gray-500 p-1 select-none">
-                  <Heroicons.icon name="cog-6-tooth" type="outline" class="h-4 w-4 text-gray-800" />
-                </span>
+                <button
+                  class="w-5 h-5 mt-1 settings-button text-gray-500 p-1 select-none"
+                  phx-click={:show_settings}
+                  phx-value-widget_id={widget[:id]}
+                >
+                </button>
               </div>
               <div class="grow flex justify-center flex-col h-full mx-auto px-2">
                 <%= render_widget(assigns, widget) %>
@@ -99,6 +112,30 @@ defmodule IotDashboardWeb.DashboardLive do
           </div>
         </div>
       </div>
+      <%= if assigns[:show_settings_modal] do %>
+        <.modal show={true} id="modal" on_cancel={JS.push("hide_settings_modal")}>
+          <h1>Settings for widget <%= @selected_widget[:id] %></h1>
+          <.form for={@selected_widget_form} phx-submit="save_settings">
+            <.input type="text" field={@selected_widget_form[:title]} />
+            <input type="hidden" name="widget_id" value={@selected_widget[:id]} />
+            <button
+              type="submit"
+              class="bg-blue-800 text-white px-2 py-1 rounded mt-2"
+              phx-click={JS.push("hide_settings_modal")}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              class="text-gray-600 px-2 py-1 border rounded mt-2"
+              phx-click={JS.push("hide_settings_modal")}
+            >
+              Cancel
+            </button>
+          </.form>
+        </.modal>
+      <% end %>
+
       <details>
         <summary class="fixed overflow-hidden right-1 bottom-1 bg-green-300 z-10 p-2 rounded">
           <span class="text-serif">Inspect</span>
@@ -126,12 +163,46 @@ defmodule IotDashboardWeb.DashboardLive do
     }
   end
 
+  def handle_event("show_settings", %{"widget_id" => widget_id}, socket) do
+    widget =
+      socket.assigns.widgets
+      |> Enum.find(fn w -> w[:id] == widget_id end)
+
+    {:noreply,
+     socket
+     |> assign(:show_settings_modal, true)
+     |> assign(
+       :selected_widget_form,
+       to_form(%{"id" => widget[:id], "title" => widget[:options]["title"]})
+     )
+     |> assign(
+       :selected_widget,
+       widget
+     )}
+  end
+
+  def handle_event("hide_settings_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_settings_modal, false)
+     |> assign(:selected_widget, nil)}
+  end
+
   def handle_event("toggle_lock", %{"locked" => "true"}, socket) do
     {:noreply, socket |> assign(locked: false)}
   end
 
   def handle_event("toggle_lock", %{"locked" => "false"}, socket) do
     {:noreply, socket |> assign(locked: true)}
+  end
+
+  def handle_event("save_settings", params, socket) do
+    updated_dashboard = Dashboards.update_options(params["widget_id"], "title", params["title"])
+
+    {
+      :noreply,
+      assign(socket, :widgets, updated_dashboard.widgets)
+    }
   end
 
   # do nothing if the dashboard is locked, to avoid JS errors!!!

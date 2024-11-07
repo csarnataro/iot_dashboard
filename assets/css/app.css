@@ -1,6 +1,7 @@
 @import "../node_modules/gridstack/dist/gridstack.min.css";
 @import "./gridstack-24-cols.css";
 @import "./switch.css";
+@import "./inline-icons.css";
 
 @import "tailwindcss/base";
 @import "tailwindcss/components";
