@@ -14,7 +14,7 @@ defmodule IotDashboard.Mqtt.PublishHandler do
     message =
       case Jason.decode(message[:payload] |> String.replace("\'", "\"")) do
         {:ok, payload} ->
-          %{"id" => topic_id, "value" => "#{payload}"}
+          %{"property" => topic_id, "value" => "#{payload}"}
 
         _ ->
           %{"value" => "--"}

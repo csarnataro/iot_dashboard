@@ -35,3 +35,4 @@ iot_dashboard-*.tar
 npm-debug.log
 /assets/node_modules/
 
+/micropython/

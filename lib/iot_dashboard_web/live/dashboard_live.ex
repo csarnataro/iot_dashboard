@@ -4,7 +4,6 @@ defmodule IotDashboardWeb.DashboardLive do
   import IotDashboardWeb.Modals
 
   alias IotDashboardWeb.Widgets.Status
-  alias IotDashboard.WidgetRegistry
   alias IotDashboard.Mqtt.Client, as: MqttClient
   alias IotDashboard.Dashboards
   alias IotDashboardWeb.Widgets.NotAvailable
@@ -36,7 +35,7 @@ defmodule IotDashboardWeb.DashboardLive do
       socket
       |> assign(locked: true)
       |> assign(:widgets, widgets)
-      |> assign(:dashboard, dashboard)
+      |> assign(:dashboard_name, dashboard.name)
 
     {:ok, socket}
   end
@@ -52,10 +51,15 @@ defmodule IotDashboardWeb.DashboardLive do
         if Map.has_key?(assigns, :locked), do: assigns[:locked], else: true
       end)
 
+    # if widget.min_width, do: widget.min_width, else: 2}
+    # if widget.min_height, do: widget.min_height, else: 2}
+    # if widget.max_width, do: widget.max_width, else: 6}
+    # if widget.max_height, do: widget.max_height, else: 6}
+
     ~H"""
     <div>
       <div class="flex justify-between w-full pb-1">
-        <div>Dashboard 1</div>
+        <div><%= @dashboard_name %></div>
         <nav aria-label="Toolbar" class="xt-list xt-list-2">
           <button
             title="Click to add a new widget"
@@ -89,17 +93,17 @@ defmodule IotDashboardWeb.DashboardLive do
         >
           <div
             :for={widget <- @widgets}
-            id={"w_#{widget[:id]}"}
+            id={"w_#{widget.id}"}
             class="grid-stack-item"
             gs-locked="yes"
-            gs-x={widget[:x]}
-            gs-y={widget[:y]}
-            gs-w={widget[:width]}
-            gs-h={widget[:height]}
-            gs-min-w={if widget[:min_width], do: widget[:min_width], else: 2}
-            gs-min-h={if widget[:min_height], do: widget[:min_height], else: 2}
-            gs-max-w={if widget[:max_width], do: widget[:max_width], else: 6}
-            gs-max-h={if widget[:max_height], do: widget[:max_height], else: 6}
+            gs-x={widget.x}
+            gs-y={widget.y}
+            gs-w={widget.width}
+            gs-h={widget.height}
+            gs-min-w={1}
+            gs-min-h={1}
+            gs-max-w={6}
+            gs-max-h={6}
           >
             <div class={"grid-stack-item-content border rounded-lg bg-white pt-0 pb-2 h-100 flex flex-col #{if @locked, do: "blocked_widget"}"}>
               <div class={"card-header justify-between flex shrink pl-2 pr-1 #{if @locked, do: "cursor-auto", else: "cursor-pointer" }"}>
@@ -107,19 +111,19 @@ defmodule IotDashboardWeb.DashboardLive do
                   :::
                 </span>
                 <span
-                  title={widget[:options]["title"]}
+                  title={widget.options["title"]}
                   class={"relative text-xs p-1 text-ellipsis text-nowrap overflow-hidden w-full select-none transition-all #{if @locked, do: "left-[-15px]", else: "left-[5px]" }"}
                 >
-                  <%= widget[:options]["title"] %>
+                  <%= widget.options["title"] %>
                 </span>
                 <button
                   class="w-5 h-5 mt-1 settings-button text-gray-500 p-1 select-none"
                   phx-click={:show_settings}
-                  phx-value-widget_id={widget[:id]}
+                  phx-value-widget_id={widget.id}
                 >
                 </button>
               </div>
-              <div class="grow flex justify-center flex-col items-center h-full px-2">
+              <div class="grow flex justify-center flex-col items-center h-full px-2 overflow-hidden">
                 <%= render_widget(assigns, widget) %>
               </div>
             </div>
@@ -141,7 +145,7 @@ defmodule IotDashboardWeb.DashboardLive do
           id="details_box"
           class="fixed block text-xs overflow-auto right-1 w-96 h-[50vh] rounded bottom-12 bg-yellow-100 z-10 p-2"
         >
-        <pre><%= inspect(@dashboard.widgets, pretty: true) %></pre>
+        <pre><%= inspect(@widgets, pretty: true) %></pre>
       </pre>
       </details>
     </div>
@@ -199,15 +203,19 @@ defmodule IotDashboardWeb.DashboardLive do
   def handle_event("show_settings", %{"widget_id" => widget_id}, socket) do
     widget =
       socket.assigns.widgets
-      |> Enum.find(fn w -> w[:id] == widget_id end)
+      |> Enum.find(fn w -> w.id == widget_id end)
+
+    form =
+      to_form(%{
+        "id" => widget.id,
+        "title" => widget.options["title"],
+        "property" => widget.properties
+      })
 
     {:noreply,
      socket
      |> assign(:show_settings_modal, true)
-     |> assign(
-       :selected_widget_form,
-       to_form(%{"id" => widget[:id], "title" => widget[:options]["title"]})
-     )
+     |> assign(:selected_widget_form, form)
      |> assign(
        :selected_widget,
        widget
@@ -226,11 +234,27 @@ defmodule IotDashboardWeb.DashboardLive do
   end
 
   def handle_event("toggle_lock", %{"locked" => "false"}, socket) do
-    {:noreply, socket |> assign(locked: true)}
+    dashboard = Dashboards.get_dashboard("dashboard_id")
+
+    {:noreply,
+     socket
+     |> assign(locked: true)
+     |> assign(:widgets, dashboard.widgets)}
   end
 
-  def handle_event("save_settings", %{"widget_id" => widget_id, "title" => title}, socket) do
+  def handle_event(
+        "save_settings",
+        params,
+        socket
+      ) do
+    IO.puts("******** BEGIN: dashboard_live:251 ********")
+    IO.inspect(params, pretty: true)
+    IO.puts("********   END: dashboard_live:251 ********")
+
+    %{"widget_id" => widget_id, "title" => title, "property" => property} = params
     updated_dashboard = Dashboards.update_options(widget_id, "title", title)
+
+    updated_dashboard = Dashboards.update_widget_fields(widget_id, %{properties: [property]})
 
     {
       :noreply,
@@ -241,7 +265,8 @@ defmodule IotDashboardWeb.DashboardLive do
   end
 
   # do nothing if the dashboard is locked, to avoid JS errors!!!
-  def handle_info({:new_mqtt_message, _message}, %{assigns: %{locked: false}} = socket) do
+  def handle_info({:new_mqtt_message, message}, %{assigns: %{locked: false}} = socket) do
+    Dashboards.update_last_value(message["property"], message["value"])
     {:noreply, socket}
   end
 
@@ -250,23 +275,11 @@ defmodule IotDashboardWeb.DashboardLive do
         {:new_mqtt_message, message},
         %{assigns: %{locked: true}} = socket
       ) do
-    {:ok, widgets} =
-      Dashboards.get_dashboard("dashboard_id")
-      |> Map.fetch(:widgets)
-
-    IO.puts("******** BEGIN: dashboard_live:255 ********")
-    IO.inspect(message["value"], pretty: true)
-    IO.puts("********   END: dashboard_live:255 ********")
-
-    widget_index = Enum.find_index(widgets, fn w -> if w.id == message["id"], do: w end)
-    widget_to_update = Enum.at(widgets, widget_index) |> Map.put(:value, message["value"])
-    widgets = List.replace_at(widgets, widget_index, widget_to_update)
-
-    Dashboards.update_all_widgets(widgets)
+    updated_dashboard = Dashboards.update_last_value(message["property"], message["value"])
 
     {
       :noreply,
-      assign(socket, :widgets, widgets)
+      assign(socket, :widgets, updated_dashboard.widgets)
     }
   end
 
@@ -274,7 +287,7 @@ defmodule IotDashboardWeb.DashboardLive do
     value = invariant(widget, :value, "--")
     data_type = invariant(widget, :data_type, "string")
     type = invariant(widget, :type, "text")
-    options = widget[:options]
+    options = widget.options
 
     get_func_component(type).(
       assigns

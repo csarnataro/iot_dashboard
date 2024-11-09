@@ -7,7 +7,10 @@ defmodule IotDashboardWeb.Modals do
   def new_widget_modal(assigns) do
     assigns =
       assigns
-      |> assign(:form, to_form(%{"type" => "text", "name" => "My Widget", "property" => ""}))
+      |> assign(
+        :form,
+        to_form(%{"type" => "text", "options[name]" => "My Widget", "property" => ""})
+      )
 
     ~H"""
     <.modal show={true} id="modal" on_cancel={JS.push("hide_new_widget_modal")}>
@@ -51,7 +54,7 @@ defmodule IotDashboardWeb.Modals do
   def settings_modal(assigns) do
     w = assigns.widget
 
-    heading = if Map.has_key?(w[:options], "title"), do: w[:options]["title"], else: w[:id]
+    heading = if Map.has_key?(w.options, "title"), do: w.options["title"], else: w.id
 
     assigns =
       assigns
@@ -61,8 +64,9 @@ defmodule IotDashboardWeb.Modals do
     <.modal show={true} id="modal" on_cancel={JS.push("hide_settings_modal")}>
       <h1>Settings for widget <%= @heading %></h1>
       <.form for={@form} phx-submit="save_settings">
-        <.input type="text" field={@form[:title]} />
-        <input type="hidden" name="widget_id" value={@widget[:id]} />
+        <input type="hidden" name="widget_id" value={@widget.id} />
+        <.input label="Title" type="text" field={@form[:title]} />
+        <.input label="Property" type="text" field={@form[:property]} />
         <button type="submit" class="bg-blue-800 text-white px-2 py-1 rounded mt-2">
           Save
         </button>
@@ -80,7 +84,7 @@ defmodule IotDashboardWeb.Modals do
         type="button"
         class="bg-red-600 text-white px-2 py-1 border rounded border border-red-800"
         phx-click="delete_widget"
-        phx-value-widget_id={w[:id]}
+        phx-value-widget_id={w.id}
       >
         Delete widget
       </button>
