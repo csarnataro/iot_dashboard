@@ -42,6 +42,13 @@ config :iot_dashboard, IotDashboardWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
+# Configure your database
+config :iot_dashboard, IotDashboard.Repo,
+  database: Path.expand("../iot_dashboard_dev.db", __DIR__),
+  pool_size: 5,
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true
+
 # Watch static and templates for browser reloading.
 config :iot_dashboard, IotDashboardWeb.Endpoint,
   live_reload: [

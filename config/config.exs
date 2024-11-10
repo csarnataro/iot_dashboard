@@ -8,6 +8,7 @@
 import Config
 
 config :iot_dashboard,
+  ecto_repos: [IotDashboard.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configures the endpoint

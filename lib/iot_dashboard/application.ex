@@ -11,6 +11,7 @@ defmodule IotDashboard.Application do
       IotDashboard.Dashboards,
       IotDashboard.WidgetRegistry,
       IotDashboardWeb.Telemetry,
+      IotDashboard.Repo,
       {DNSCluster, query: Application.get_env(:iot_dashboard, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: IotDashboard.PubSub},
       # Start a worker by calling: IotDashboard.Worker.start_link(arg)
