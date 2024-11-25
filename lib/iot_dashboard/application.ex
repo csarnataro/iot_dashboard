@@ -8,8 +8,6 @@ defmodule IotDashboard.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      IotDashboard.Dashboards,
-      IotDashboard.WidgetRegistry,
       IotDashboardWeb.Telemetry,
       IotDashboard.Repo,
       {DNSCluster, query: Application.get_env(:iot_dashboard, :dns_cluster_query) || :ignore},

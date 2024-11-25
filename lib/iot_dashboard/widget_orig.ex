@@ -1,4 +1,4 @@
-defmodule IotDashboard.Widget do
+defmodule IotDashboard.WidgetOrig do
   @enforce_keys [:id]
   defstruct [
     :id,

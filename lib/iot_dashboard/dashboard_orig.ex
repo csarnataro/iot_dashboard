@@ -1,3 +1,3 @@
-defmodule IotDashboard.Dashboard do
+defmodule IotDashboard.DashboardOrig do
   defstruct widgets: [], name: "My sDashboard"
 end

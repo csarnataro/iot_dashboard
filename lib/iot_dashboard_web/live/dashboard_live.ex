@@ -14,7 +14,7 @@ defmodule IotDashboardWeb.DashboardLive do
   use IotDashboardWeb, :live_view
 
   def mount(_params, _session, socket) do
-    dashboard = Dashboards.get_dashboard("dashboard_id")
+    dashboard = Dashboards.get_dashboard(1)
 
     # for widget <- if(dashboard != nil, do: dashboard.widgets, else: []) do
     #   WidgetRegistry.register_widget(widget.id)
@@ -34,8 +34,10 @@ defmodule IotDashboardWeb.DashboardLive do
     socket =
       socket
       |> assign(locked: true)
-      |> assign(:widgets, widgets)
-      |> assign(:dashboard_name, dashboard.name)
+      |> assign(widgets: widgets)
+      |> assign(dashboard_id: dashboard.id)
+      |> assign(dashboard: dashboard)
+      |> assign(dashboard_name: dashboard.title)
 
     {:ok, socket}
   end
@@ -131,7 +133,7 @@ defmodule IotDashboardWeb.DashboardLive do
         </div>
       </div>
       <%= if assigns[:show_new_widget_modal] do %>
-        <.new_widget_modal />
+        <.new_widget_modal dashboard_id={@dashboard_id} />
       <% end %>
       <%= if assigns[:show_settings_modal] do %>
         <.settings_modal widget={@selected_widget} form={@selected_widget_form} />
@@ -178,15 +180,30 @@ defmodule IotDashboardWeb.DashboardLive do
 
   def handle_event(
         "add_new_widget",
-        %{"type" => type, "name" => name, "property" => property},
+        params,
         socket
       ) do
-    updated_dashboard = Dashboards.create_widget(type, name, property)
+    case Dashboards.create_widget_with_defaults(params) do
+      {:error, rest} ->
+        IO.puts("******** BEGIN: dashboard_live:186 ********")
+        dbg(rest)
+        IO.puts("********   END: dashboard_live:186 ********")
 
-    {
-      :noreply,
-      assign(socket, :widgets, updated_dashboard.widgets)
-    }
+        {
+          :noreply,
+          socket
+        }
+
+      _ ->
+        Dashboards.get_dashboard(socket.assigns.dashboard_id)
+
+        updated_dashboard = Dashboards.get_dashboard(socket.assigns.dashboard_id)
+
+        {
+          :noreply,
+          assign(socket, :widgets, updated_dashboard.widgets)
+        }
+    end
   end
 
   def handle_event("delete_widget", %{"widget_id" => widget_id}, socket) do
@@ -201,25 +218,32 @@ defmodule IotDashboardWeb.DashboardLive do
   end
 
   def handle_event("show_settings", %{"widget_id" => widget_id}, socket) do
-    widget =
-      socket.assigns.widgets
-      |> Enum.find(fn w -> w.id == widget_id end)
+    case Integer.parse(widget_id) do
+      {widget_id, _} ->
+        widget = Dashboards.get_widget!(widget_id)
+        IO.puts("******** BEGIN: dashboard_live:225 ********")
+        dbg(widget_id)
+        IO.puts("********   END: dashboard_live:225 ********")
 
-    form =
-      to_form(%{
-        "id" => widget.id,
-        "title" => widget.options["title"],
-        "property" => widget.properties
-      })
+        form =
+          to_form(%{
+            "id" => widget.id,
+            "title" => widget.options["title"],
+            "property" => widget.properties
+          })
 
-    {:noreply,
-     socket
-     |> assign(:show_settings_modal, true)
-     |> assign(:selected_widget_form, form)
-     |> assign(
-       :selected_widget,
-       widget
-     )}
+        {:noreply,
+         socket
+         |> assign(:show_settings_modal, true)
+         |> assign(:selected_widget_form, form)
+         |> assign(
+           :selected_widget,
+           widget
+         )}
+
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("hide_settings_modal", _params, socket) do
@@ -248,25 +272,33 @@ defmodule IotDashboardWeb.DashboardLive do
         socket
       ) do
     IO.puts("******** BEGIN: dashboard_live:251 ********")
-    IO.inspect(params, pretty: true)
+    IO.inspect(socket.assigns.dashboard_id, pretty: true)
     IO.puts("********   END: dashboard_live:251 ********")
 
-    %{"widget_id" => widget_id, "title" => title, "property" => property} = params
-    updated_dashboard = Dashboards.update_options(widget_id, "title", title)
+    %{"widget_id" => id, "title" => title, "property" => property} = params
 
-    updated_dashboard = Dashboards.update_widget_fields(widget_id, %{properties: [property]})
+    Dashboards.update_widget(id, %{id: id, options: %{title: title}, properties: property})
+
+    dashboard = Dashboards.get_dashboard!(socket.assigns.dashboard_id)
 
     {
       :noreply,
       socket
-      |> assign(:widgets, updated_dashboard.widgets)
+      |> assign(:widgets, dashboard.widgets)
       |> assign(:show_settings_modal, false)
     }
   end
 
   # do nothing if the dashboard is locked, to avoid JS errors!!!
   def handle_info({:new_mqtt_message, message}, %{assigns: %{locked: false}} = socket) do
-    Dashboards.update_last_value(message["property"], message["value"])
+    case socket.assigns.dashboard do
+      dashboard when dashboard !== nil ->
+        Dashboards.update_last_value(dashboard.id, message["property"], message["value"])
+
+      _ ->
+        nil
+    end
+
     {:noreply, socket}
   end
 
@@ -275,12 +307,20 @@ defmodule IotDashboardWeb.DashboardLive do
         {:new_mqtt_message, message},
         %{assigns: %{locked: true}} = socket
       ) do
-    updated_dashboard = Dashboards.update_last_value(message["property"], message["value"])
+    case socket.assigns.dashboard do
+      dashboard when dashboard !== nil ->
+        Dashboards.update_last_value(dashboard.id, message["property"], message["value"])
+        updated_dashboard = Dashboards.get_dashboard(dashboard.id)
 
-    {
-      :noreply,
-      assign(socket, :widgets, updated_dashboard.widgets)
-    }
+        {
+          :noreply,
+          assign(socket, :widgets, updated_dashboard.widgets)
+        }
+
+      _ ->
+        nil
+        {:noreply, socket}
+    end
   end
 
   defp render_widget(assigns, widget) do

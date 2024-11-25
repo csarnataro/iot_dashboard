@@ -1,11 +1,9 @@
-defmodule IotDashboard.Dashboards do
-  alias IotDashboard.Widget
-  alias IotDashboard.Dashboard
+defmodule IotDashboard.DashboardsOrig do
   use GenServer
 
-  @initial_dashboard %Dashboard{
+  @initial_dashboard %{
     widgets: [
-      %Widget{
+      %{
         :id => "1",
         :y => 0,
         :x => 0,
@@ -17,7 +15,7 @@ defmodule IotDashboard.Dashboards do
           "title" => "Temperatura 1"
         }
       },
-      %Widget{
+      %{
         :id => "2",
         :data_type => "float",
         :x => 3,
@@ -31,7 +29,7 @@ defmodule IotDashboard.Dashboards do
           "title" => "Temp 2"
         }
       },
-      %Widget{
+      %{
         :id => "3",
         :data_type => "float",
         :value => 3.4,
@@ -46,7 +44,7 @@ defmodule IotDashboard.Dashboards do
           "title" => "Temp 3"
         }
       },
-      %Widget{
+      %{
         :id => "4",
         :x => 9,
         :y => 0,
@@ -57,7 +55,7 @@ defmodule IotDashboard.Dashboards do
           "title" => "Temp 4"
         }
       },
-      %Widget{
+      %{
         :id => "s3",
         :x => 1,
         :y => 4,
