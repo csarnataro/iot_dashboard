@@ -9,13 +9,14 @@ defmodule IotDashboardWeb.Modals do
       assigns
       |> assign(
         :form,
-        to_form(%{"type" => "text", "options[name]" => "My Widget", "property" => ""})
+        to_form(%{"type" => "text", "name" => "My Widget", "property" => ""})
       )
 
     ~H"""
     <.modal show={true} id="modal" on_cancel={JS.push("hide_new_widget_modal")}>
       <h1 class="bold text-lg mt-2">Add new widget</h1>
       <.form for={@form} phx-submit="add_new_widget">
+        <input type="hidden" name="dashboard_id" value={@dashboard_id} />
         <.input
           label="Type"
           field={@form["type"]}
