@@ -1,5 +1,0 @@
-Generate dashboard table
-
-mix phx.gen.schema Dashboard.Dashboard dashboards title:string
-
-mix phx.gen.schema Dashboard.Widget widgets title value y:integer x:integer width:integer height:integer type properties options dashboard_id:references:dashboards

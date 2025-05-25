@@ -9,6 +9,15 @@ Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
 Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
 
+## Fake MQTT Client
+For development purpose, a fake IoT device can be simulated launching the command 
+
+```sh
+mix run fake_iot_device.exs
+```
+
+It will send a counter to the specified topic every 10 seconds
+
 ## Learn more
 
   * Official website: https://www.phoenixframework.org/

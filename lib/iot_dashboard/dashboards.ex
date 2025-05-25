@@ -4,6 +4,8 @@ defmodule IotDashboard.Dashboards do
   """
 
   import Ecto.Query, warn: false
+  alias IotDashboard.Dashboards.WidgetOption
+  alias IotDashboard.Dashboards.WidgetRegistry
   alias IotDashboard.Repo
 
   alias IotDashboard.Dashboards.Dashboard
@@ -35,10 +37,10 @@ defmodule IotDashboard.Dashboards do
       ** (Ecto.NoResultsError)
 
   """
-  def get_dashboard!(id), do: Repo.get!(Dashboard, id) |> Repo.preload([:widgets])
+  def get_dashboard!(id), do: Repo.get!(Dashboard, id) |> Repo.preload(widgets: [:options])
 
   def get_dashboard(id) do
-    case Repo.get(Dashboard, id) |> Repo.preload([:widgets]) do
+    case Repo.get(Dashboard, id) |> Repo.preload(widgets: [:options]) do
       nil -> %{name: "Untitled", widgets: []}
       record -> record
     end
@@ -121,7 +123,7 @@ defmodule IotDashboard.Dashboards do
 
   """
   def list_widgets do
-    Repo.all(Widget)
+    Repo.all(Widget) |> Repo.preload(:options)
   end
 
   @doc """
@@ -138,7 +140,11 @@ defmodule IotDashboard.Dashboards do
       ** (Ecto.NoResultsError)
 
   """
-  def get_widget!(id), do: Repo.get!(Widget, id)
+  def get_widget!(id) do
+    Repo.get!(Widget, id)
+    |> Repo.preload(:options)
+    |> IO.inspect()
+  end
 
   @doc """
   Creates a widget.
@@ -164,22 +170,25 @@ defmodule IotDashboard.Dashboards do
         "property" => property,
         "name" => name
       }) do
+    widget_defaults =
+      WidgetRegistry.catalog()
+      |> Map.fetch!(String.to_existing_atom(type))
+      |> Map.fetch!(:defaults)
+
+    name = if name, do: name, else: widget_defaults[:name]
+
     attrs_with_default = %{
       :x => 0,
       :y => 0,
-      :width => 2,
-      :height => 2,
+      :width => widget_defaults[:width],
+      :height => widget_defaults[:height],
       :type => type,
       :properties => property,
-      :options => %{
-        "title" => name
-      },
-      :dashboard_id => dashboard_id
+      :dashboard_id => dashboard_id,
+      :options => [%{:name => "name", :value => name}]
     }
 
-    %Widget{}
-    |> Widget.changeset(attrs_with_default)
-    |> Repo.insert()
+    create_widget(attrs_with_default)
   end
 
   @doc """
@@ -194,21 +203,19 @@ defmodule IotDashboard.Dashboards do
       {:error, %Ecto.Changeset{}}
 
   """
-  def update_widget(widget_id, attrs) when is_binary(widget_id) do
-    # dbg(attrs)
-    # %{title: title,
+  def update_widget_properties(widget_id, attrs) when is_binary(widget_id) do
     %{properties: properties} = attrs
-
-    IO.puts("******** BEGIN: Dashboards:200 ********")
-
-    from(w in Widget, select: json_extract_path(w.options, ["title"]))
-    |> Repo.all()
-    |> IO.inspect()
-
-    IO.puts("********   END: Dashboards:200 ********")
 
     from(w in Widget, where: w.id == ^widget_id)
     |> Repo.update_all(set: [properties: properties])
+  end
+
+  def update_widget(widget_id, attrs) when is_binary(widget_id) do
+    widget = get_widget!(widget_id)
+
+    update_widget(widget, attrs)
+    # from(w in Widget, where: w.id == ^widget_id)
+    # |> Repo.update_all(set: attrs)
   end
 
   @doc """
@@ -226,6 +233,10 @@ defmodule IotDashboard.Dashboards do
     widget
     |> Widget.changeset(attrs)
     |> Repo.update()
+  end
+
+  def delete_widget(widget_id) when is_binary(widget_id) do
+    from(x in Widget, where: x.id == ^widget_id) |> Repo.delete_all()
   end
 
   @doc """
@@ -258,6 +269,11 @@ defmodule IotDashboard.Dashboards do
   end
 
   def update_last_value(dashboard_id, property_name, value) do
+    IO.puts("******** BEGIN: Dashboards:272 ********")
+    dbg(property_name)
+    dbg(value)
+    IO.puts("********   END: Dashboards:272 ********")
+
     from(w in Widget, where: w.dashboard_id == ^dashboard_id and w.properties == ^property_name)
     |> Repo.update_all(set: [value: value])
 

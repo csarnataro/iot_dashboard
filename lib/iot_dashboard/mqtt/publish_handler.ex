@@ -11,6 +11,10 @@ defmodule IotDashboard.Mqtt.PublishHandler do
   def handle_publish(message, _term) do
     topic_id = String.split(message[:topic], "/") |> List.last()
 
+    IO.puts("******** BEGIN: publish_handler:14 ********")
+    dbg(message)
+    IO.puts("********   END: publish_handler:14 ********")
+
     message =
       case Jason.decode(message[:payload] |> String.replace("\'", "\"")) do
         {:ok, payload} ->
