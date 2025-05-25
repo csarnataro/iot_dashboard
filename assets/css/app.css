@@ -7,8 +7,3 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 /* This file is for your main application CSS */
-
-
-.ui-resizable-autohide > div {
-    background-color: rgba(0, 0 ,0, 0.02);
-}

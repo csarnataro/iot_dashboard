@@ -10,7 +10,6 @@ defmodule IotDashboard.Repo.Migrations.CreateWidgets do
       add :height, :integer
       add :type, :string
       add :properties, :string
-      add :options, :string
       add :dashboard_id, references(:dashboards, on_delete: :nothing)
 
       timestamps(type: :utc_datetime)

@@ -1,8 +1,4 @@
 defmodule IotDashboard.Mqtt.MessageHandler do
-  """
-  @moduledoc Not actually used at the moment
-  """
-
   @behaviour ExMQTT.MessageHandler
 
   @impl true
